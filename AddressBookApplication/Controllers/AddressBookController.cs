@@ -1,53 +1,58 @@
+using BusinessLayer.Interface;
 using Microsoft.AspNetCore.Mvc;
-using RepositoryLayer.Entity;
+using ModelLayer.DTO;
 using RepositoryLayer.Context;
-using System.Security.Cryptography.X509Certificates;
+using RepositoryLayer.Entity;
 
-namespace AddressBookApplication.Controllers;
-
-[ApiController]
-[Route("api/addressbook")]
-public class AddressBookController : ControllerBase
-
+namespace AddressBookAPI.Controllers
 {
-    private readonly AddressBookContext _context;
-    public AddressBookController(AddressBookContext context)
+    [ApiController]
+    [Route("api/addressbook")]
+    public class AddressBookController : ControllerBase
     {
-        _context = context;
-    }
-    ///<summary> Fetch all the contacts from the address book </summary>
-    /// <returns> List of contacts </returns>
-    [HttpGet]
-    public ActionResult<IEnumerable<AddressBookEntry>> GetAllContacts()
-    {
-        try
-        {
-            var contacts = _context.AddressBooks.ToList();
-            if (!contacts.Any())
-            {
-                return NotFound("No contacts found");
-            }
-            return Ok(contacts);
-        }
-        catch (Exception)
-        {
-            return StatusCode(500, "Internal Server Error");
+        private readonly IAddressBookBL _addressBookBL;
 
+        public AddressBookController(IAddressBookBL addressBookBL)
+        {
+            _addressBookBL = addressBookBL;
         }
-    }
 
-        ///<summary> Get a Contact by ID </summary>
-        /// <param name="id"> ID of the contact </param>
-        /// <returns> Contact with the given ID </returns>
-        [HttpGet("{id}")]
-        public ActionResult<AddressBookEntry> GetContactById(int id)
+
+        /// <summary> Fetch all contacts from the address book </summary>
+        /// <returns>List of AddressBookDTO entries</returns>
+        [HttpGet]
+        public ActionResult<IEnumerable<AddressBookDTO>> GetAllContacts()
         {
             try
             {
-                var contact = _context.AddressBooks.Find(id);
+                var contacts = _addressBookBL.GetAllContacts();
+                if (contacts == null || contacts.Count == 0)
+                {
+                    return NotFound("No contacts found.");
+                }
+                return Ok(contacts);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Internal Server Error");
+            }
+        }
+
+
+        /// <summary>
+        /// Get a contact by ID.
+        /// </summary>
+        /// <param name="id">ID of the contact</param>
+        /// <returns>Contact details</returns>
+        [HttpGet("{id}")]
+        public ActionResult<AddressBookDTO> GetById(int id)
+        {
+            try
+            {
+                var contact = _addressBookBL.GetById(id);
                 if (contact == null)
                 {
-                    return NotFound("Contact not found");
+                    return NotFound($"Contact with ID {id} not found.");
                 }
                 return Ok(contact);
             }
@@ -57,81 +62,75 @@ public class AddressBookController : ControllerBase
             }
         }
 
-    ///<summary> Add a new contact to the address book </summary>
-    /// <param name="contact"> Contact to be added </param>
-    /// <returns> The added contact </returns>
-    [HttpPost]
-    public ActionResult<AddressBookEntry> AddContact(AddressBookEntry contact)
-    {
-        try
+
+        /// <summary>
+        /// Add a new contact to the address book
+        /// </summary>
+        /// <param name="contact">New contact details</param>
+        /// <returns>Created Contact</returns>
+        [HttpPost]
+        public ActionResult<AddressBookDTO> AddContact(AddressBookDTO contact)
         {
-            _context.AddressBooks.Add(contact);
-            _context.SaveChanges();
-            return CreatedAtAction(nameof(GetContactById), new { id = contact.Id }, contact);
-        }
-        catch (Exception)
-        {
-            return StatusCode(500, "Internal Server Error");
-        }
-    }
-    /// <summary>
-    /// Update an existing contact
-    /// </summary>
-    /// <param name="id">Id of the contact</param>
-    /// <param name="updatedContact">Updated contact details</param>
-    /// <returns>Updated Contact</returns>
-    [HttpPut("{id}")]
-    public ActionResult<AddressBookEntry> UpdateContact(int id, AddressBookEntry updatedContact)
-    {
-        try
-        {
-            var existingContact = _context.AddressBooks.Find(id);
-            if (existingContact == null)
+            try
             {
-                return NotFound($"Contact with ID {id} not found.");
+                var newContact = _addressBookBL.AddContact(contact);
+                return CreatedAtAction(nameof(GetById), new { id = newContact }, newContact);
             }
-
-            existingContact.Name = updatedContact.Name;
-            existingContact.Email = updatedContact.Email;
-            existingContact.Phone = updatedContact.Phone;
-            existingContact.Address = updatedContact.Address;
-
-            _context.SaveChanges();
-            return Ok(existingContact);
-        }
-        catch (Exception)
-        {
-            return StatusCode(500, "Internal Server Error");
-        }
-    }
-
-
-    /// <summary>
-    /// Delete a contact by ID
-    /// </summary>
-    /// <param name="id">ID of the contact</param>
-    /// <returns>Deletion status</returns>
-    [HttpDelete("{id}")]
-    public IActionResult DeleteContact(int id)
-    {
-        try
-        {
-            var contact = _context.AddressBooks.Find(id);
-            if (contact == null)
+            catch (Exception)
             {
-                return NotFound($"Contact with ID {id} not found.");
+                return StatusCode(500, "Internal Server Error");
             }
-
-            _context.AddressBooks.Remove(contact);
-            _context.SaveChanges();
-            return Ok("Contact deleted successfully.");
         }
-        catch (Exception)
+
+
+        /// <summary>
+        /// Update an existing contact
+        /// </summary>
+        /// <param name="id">Id of the contact</param>
+        /// <param name="updatedContact">Updated contact details</param>
+        /// <returns>Updated Contact</returns>
+        [HttpPut("{id}")]
+        public IActionResult UpdateContact(int id, AddressBookDTO updatedContact)
         {
-            return StatusCode(500, "Internal Server Error");
+            try
+            {
+                var contact = _addressBookBL.UpdateContact(id, updatedContact);
+                if (contact == null)
+                {
+                    return NotFound($"Contact with ID {id} not found.");
+                }
+                return Ok(contact);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Internal Server Error");
+            }
         }
+
+
+        /// <summary>
+        /// Delete a contact by ID
+        /// </summary>
+        /// <param name="id">ID of the contact</param>
+        /// <returns>Deletion status</returns>
+        [HttpDelete("{id}")]
+        public IActionResult DeleteContact(int id)
+        {
+            try
+            {
+                var result = _addressBookBL.DeleteContact(id);
+                if (!result)
+                {
+                    return NotFound($"Contact with ID {id} not found.");
+                }
+                return Ok("Contact deleted successfully.");
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Internal Server Error");
+            }
+        }
+
+
     }
-
-
 }
-
