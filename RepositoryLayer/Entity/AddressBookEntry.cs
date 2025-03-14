@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace RepositoryLayer.Entity
 {
-    public class AddressBookEntity
+    public class AddressBookEntry
     {
         [Key]
         public int Id { get; set; }
