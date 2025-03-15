@@ -1,20 +1,22 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 using AutoMapper;
 using BusinessLayer.Interface;
 using BusinessLayer.Service;
 using BusinessLayer.Validation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using RepositoryLayer.Context;
+using RepositoryLayer.Helper;
 using RepositoryLayer.Interface;
 using RepositoryLayer.Service;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddControllers();
-builder.Services.AddScoped<IAddressBookRL, AddressBookRL>();
-builder.Services.AddScoped<IAddressBookBL, AddressBookBL>();
 
 
 
@@ -35,16 +37,39 @@ builder.Services.AddControllers()
 
 
 
+// Add OpenAPI (Swagger) support
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
+builder.Services.AddSingleton<JwtHelper>();
+builder.Services.AddScoped<IAddressBookRL, AddressBookRL>();
+builder.Services.AddScoped<IUserRL, UserRL>();
+builder.Services.AddScoped<IAddressBookBL, AddressBookBL>();
+builder.Services.AddScoped<IUserBL, UserBL>();
 
+// Configure Database Context
 var connectionString = builder.Configuration.GetConnectionString("SqlConnection");
-builder.Services.AddDbContext<AddressBookContext>(options => options.UseSqlServer(connectionString));
+builder.Services.AddDbContext<AddressBookContext>(options =>
+    options.UseSqlServer(connectionString));
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters()
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+
+
+// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -52,9 +77,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
+app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
