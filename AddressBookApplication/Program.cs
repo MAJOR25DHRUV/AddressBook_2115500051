@@ -39,7 +39,20 @@ builder.Services.AddControllers()
 // Add OpenAPI (Swagger) support
 builder.Services.AddEndpointsApiExplorer();
 
+var xmlFile = "AddressBookApplication.xml";
+var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
 
+if (File.Exists(xmlPath))
+{
+    builder.Services.AddSwaggerGen(options =>
+    {
+        options.IncludeXmlComments(xmlPath);
+    });
+}
+else
+{
+    Console.WriteLine($"?? Warning: XML documentation file not found at {xmlPath}");
+}
 
 
 builder.Services.AddSingleton<JwtHelper>();
@@ -50,6 +63,7 @@ builder.Services.AddScoped<IAddressBookBL, AddressBookBL>();
 builder.Services.AddScoped<IUserBL, UserBL>();
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SMTP"));
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<RedisCacheHelper>();
 
 // Configure Database Context
 var connectionString = builder.Configuration.GetConnectionString("SqlConnection");
@@ -69,6 +83,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
     };
 });
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration["Redis:ConnectionString"];
+});
+
 
 var app = builder.Build();
 
