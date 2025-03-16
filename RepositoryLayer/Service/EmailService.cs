@@ -3,16 +3,19 @@ using System.Net.Mail;
 using System.Net;
 using Microsoft.Extensions.Options;
 using RepositoryLayer.Helper;
+using Microsoft.Extensions.Configuration;
 
 namespace RepositoryLayer.Service
 {
     public class EmailService
     {
         private readonly SmtpSettings _smtpSettings;
+        private readonly IConfiguration _configuration;
 
-        public EmailService(IOptions<SmtpSettings> smtpSettings)
+        public EmailService(IOptions<SmtpSettings> smtpSettings, IConfiguration configuration)
         {
             _smtpSettings = smtpSettings.Value;
+            _configuration = configuration;
         }
 
         public bool SendPasswordResetEmail(string email, string token, string baseUrl)
@@ -69,6 +72,51 @@ namespace RepositoryLayer.Service
                 return false;
             }
         }
+
+        public async Task SendWelcomeEmailAsync(string email)
+        {
+            Console.WriteLine($"[Debug] Sending email to: {email}");
+
+            if (!IsValidEmail(email))
+            {
+                Console.WriteLine($"[Error] Invalid email format: {email}");
+                return;
+            }
+
+            using (var smtpClient = new SmtpClient(_configuration["Smtp:Server"])
+            {
+                Port = int.Parse(_configuration["Smtp:Port"]),
+                Credentials = new NetworkCredential(_configuration["Smtp:Username"], _configuration["Smtp:Password"]),
+                EnableSsl = true
+            })
+            {
+                var mailMessage = new MailMessage
+                {
+                    From = new MailAddress(_configuration["Smtp:SenderEmail"]),
+                    Subject = "Welcome to AddressBook",
+                    Body = $"Hello,\n\nThank you for registering with AddressBook!\n\nBest Regards,\nTeam",
+                    IsBodyHtml = false
+                };
+
+                mailMessage.To.Add(email);
+                await smtpClient.SendMailAsync(mailMessage);
+                Console.WriteLine($"[RabbitMQ] Welcome email sent to {email}");
+            }
+        }
+
+        public static bool IsValidEmail(string email)
+        {
+            try
+            {
+                var addr = new MailAddress(email);
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+        }
+
 
     }
 }

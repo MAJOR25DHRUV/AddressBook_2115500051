@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Text;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
 using RabbitMQ.Client;
 
